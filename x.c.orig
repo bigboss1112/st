@@ -4,8 +4,6 @@
 #include <limits.h>
 #include <locale.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <sys/select.h>
 #include <time.h>
 #include <unistd.h>
@@ -21,8 +19,6 @@ char *argv0;
 #include "arg.h"
 #include "st.h"
 #include "win.h"
-
-#include "configsystem.h"
 
 /* types used in config.h */
 typedef struct {
@@ -99,7 +95,6 @@ typedef struct {
 	Drawable buf;
 	GlyphFontSpec *specbuf; /* font spec buffer used for rendering */
 	Atom xembed, wmdeletewin, netwmname, netwmiconname, netwmpid;
-	Atom netwmstate, netwmfullscreen;
 	struct {
 		XIM xim;
 		XIC xic;
@@ -226,7 +221,6 @@ static DC dc;
 static XWindow xw;
 static XSelection xsel;
 static TermWindow win;
-config* GlobalConfig;
 
 /* Font Ring Cache */
 enum {
@@ -770,24 +764,6 @@ xresize(int col, int row)
 	xw.specbuf = xrealloc(xw.specbuf, col * sizeof(GlyphFontSpec));
 }
 
-void
-fullscreen(const Arg *arg)
-{
-	XEvent ev;
-
-	memset(&ev, 0, sizeof(ev));
-	
-	ev.xclient.type = ClientMessage;
-	ev.xclient.message_type = xw.netwmstate;
-	ev.xclient.display = xw.dpy;
-	ev.xclient.window = xw.win;
-	ev.xclient.format = 32;
-	ev.xclient.data.l[0] = 2; /* _NET_WM_STATE_TOGGLE */
-	ev.xclient.data.l[1] = xw.netwmfullscreen;
-
-	XSendEvent(xw.dpy, DefaultRootWindow(xw.dpy), False, SubstructureNotifyMask|SubstructureRedirectMask, &ev);
-}
-
 ushort
 sixd_to_16bit(int x)
 {
@@ -1254,9 +1230,6 @@ xinit(int cols, int rows)
 	xw.netwmpid = XInternAtom(xw.dpy, "_NET_WM_PID", False);
 	XChangeProperty(xw.dpy, xw.win, xw.netwmpid, XA_CARDINAL, 32,
 			PropModeReplace, (uchar *)&thispid, 1);
-
-	xw.netwmstate = XInternAtom(xw.dpy, "_NET_WM_STATE", False);
-	xw.netwmfullscreen = XInternAtom(xw.dpy, "_NET_WM_STATE_FULLSCREEN", False);
 
 	win.mode = MODE_NUMLOCK;
 	resettitle();
@@ -2132,37 +2105,6 @@ run:
 	if (!opt_title)
 		opt_title = (opt_line || !opt_cmd) ? "st" : opt_cmd[0];
 
-	GlobalConfig = configNew();
-
-	char* path = NULL;
-	asprintf(&path, "%s/.config/st.cfg", getenv("HOME"));
-
-	configLoadFile(GlobalConfig, path);
-
-	free(path);
-
-	font = configMatchS(GlobalConfig, "font", false);
-	colorname[0] = configMatchS(GlobalConfig,   "cl0", false);
-	colorname[1] = configMatchS(GlobalConfig,   "cl1", false);
-	colorname[2] = configMatchS(GlobalConfig,   "cl2", false);
-	colorname[3] = configMatchS(GlobalConfig,   "cl3", false);
-	colorname[4] = configMatchS(GlobalConfig,   "cl4", false);
-	colorname[5] = configMatchS(GlobalConfig,   "cl5", false);
-	colorname[6] = configMatchS(GlobalConfig,   "cl6", false);
-	colorname[7] = configMatchS(GlobalConfig,   "cl7", false);
-	colorname[8] = configMatchS(GlobalConfig,   "cl8", false);
-	colorname[9] = configMatchS(GlobalConfig,   "cl9", false);
-	colorname[10] = configMatchS(GlobalConfig,  "cla", false);
-	colorname[11] = configMatchS(GlobalConfig,  "clb", false);
-	colorname[12] = configMatchS(GlobalConfig,  "clc", false);
-	colorname[13] = configMatchS(GlobalConfig,  "cld", false);
-	colorname[14] = configMatchS(GlobalConfig,  "cle", false);
-	colorname[15] = configMatchS(GlobalConfig,  "clf", false);
-	colorname[256] = configMatchS(GlobalConfig, "cs", false);
-	colorname[257] = configMatchS(GlobalConfig, "rcs", false);
-	colorname[258] = configMatchS(GlobalConfig, "fg", false);
-	colorname[259] = configMatchS(GlobalConfig, "bg", false);
-
 	setlocale(LC_CTYPE, "");
 	XSetLocaleModifiers("");
 	cols = MAX(cols, 1);
@@ -2172,8 +2114,6 @@ run:
 	xsetenv();
 	selinit();
 	run();
-
-	configDelete(GlobalConfig);
 
 	return 0;
 }
